@@ -2210,6 +2210,10 @@ class ArticleDeleteView(DeleteView):
 - `UpdateView` - لتحديث عنصر موجود
 - `DeleteView` - لحذف عنصر
 
+- يوجد خصائص إخرى مثل:
+  - `fields`: للحقول
+  - `pk_url_name`: للمعرف
+
 ملف `urls.py`:
 
 ```python
@@ -2725,7 +2729,7 @@ class LoginAdmin(admin.ModelAdmin):
 admin.site.register(Contact, LoginAdmin)
 ```
 
-- يمكن وضع العناصر داخل `()` أو `[]` أو بدون أقواس
+- يمكن وضع العناصر داخل `()` أو `[]` أو `{}` أو بدون أقواس
 
 - لو وضع عنصر واحد داخل `()` يجب إضافة كوما: `('name',)`
 
