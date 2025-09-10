@@ -3037,7 +3037,7 @@ class TopicAdmin(ImportExportModelAdmin):
 
 - فكرة المشروع هو إنشاء موقع للمناقشة
 
-- يمكن الوصول إلى المشروع كاملا من [هنا](git@github.com:AHMED-ELBADRYx/Discussion-Board.git)
+- يمكن الوصول إلى المشروع كاملا من [هنا](https://github.com/AHMED-ELBADRYx/Discussion-Board)
 
 - الانتقال لمكان المشروع في سطر الأوامر ثم إنشاء البيئة:
 
