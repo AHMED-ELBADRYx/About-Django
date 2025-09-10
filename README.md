@@ -45,6 +45,10 @@
     - [FBV (Function-Based Views) - واجهات قائمة على الدوال](#fbv-function-based-views---واجهات-قائمة-على-الدوال)
     - [CBV (Class-Based Views) - واجهات قائمة على الفئات](#cbv-class-based-views---واجهات-قائمة-على-الفئات)
     - [GCBV (Generic Class-Based Views) - واجهات عامة قائمة على الفئات](#gcbv-generic-class-based-views---واجهات-عامة-قائمة-على-الفئات)
+    - [reverse vs reverse\_lazy vs redirect](#reverse-vs-reverse_lazy-vs-redirect)
+      - [reverse](#reverse)
+      - [reverse\_lazy](#reverse_lazy)
+      - [redirect](#redirect)
     - [تنظيم الروابط](#تنظيم-الروابط)
     - [كيفية استخدام أسماء الروابط في القوالب](#كيفية-استخدام-أسماء-الروابط-في-القوالب)
     - [استخدام الروابط الديناميكية مع GCBV](#استخدام-الروابط-الديناميكية-مع-gcbv)
@@ -65,6 +69,17 @@
   - [إضافة مظهر suit للوحة الإدارة](#إضافة-مظهر-suit-للوحة-الإدارة)
   - [إضافة مظهر grappelli للوحة الإدارة](#إضافة-مظهر-grappelli-للوحة-الإدارة)
   - [تخصيص طريقة عرض النماذج](#تخصيص-طريقة-عرض-النماذج)
+  - [تصدير النماذج لملف CSV من لوحة الإدارة](#تصدير-النماذج-لملف-csv-من-لوحة-الإدارة)
+  - [إنشاء مشروع تجريبي](#إنشاء-مشروع-تجريبي)
+    - [*الفرق بين UserCreationForm و User*](#الفرق-بين-usercreationform-و-user)
+    - [PAGINATION](#pagination)
+    - [كيفية إنشاء الكائن من خلال سطر الأوامر](#كيفية-إنشاء-الكائن-من-خلال-سطر-الأوامر)
+    - [كيفية إنشاء عدد من الكائنات من خلال سطر الأوامر](#كيفية-إنشاء-عدد-من-الكائنات-من-خلال-سطر-الأوامر)
+    - [WIDGET TWEAKS](#widget-tweaks)
+  - [API](#api)
+  - [تطبيق API على المشروع](#تطبيق-api-على-المشروع)
+  - [عرض حالة الطقس من خلال API](#عرض-حالة-الطقس-من-خلال-api)
+  - [نهاية الملف](#نهاية-الملف)
 
 ## التعريف
 
@@ -148,11 +163,13 @@
   - `DATABASES`: لقواعد البيانات (افتراضيا `SQL`)
     - يمكن تحميل قاعدة بيانات `PostgreSQL` للمشاريع الكبيرة من [هنا](https://www.enterprisedb.com/downloads/postgres-postgresql-downloads)
     - ثم الضغط على ملف التحميل لإتمام عملية التثبيت والضغط على `Finish` بالنهاية
-    - للتأكد من نجاح التنزبل يتم البحث والدخول على `SQL Shell` بعد واتباع التعليمات وبعدها معرفة الإصدار من خلال كتابة: `select version();`
+    - للتأكد من نجاح التنزبل يتم البحث والدخول على `SQL Shell` واتباع التعليمات وبعدها معرفة الإصدار من خلال كتابة: `select version();`
     - لإضافة واجهة يتم البحث والدخول على `pgAdmin` وإضافة السيرفر (كتابة اسمه في `General` وكتابة اسمه أو المعرف من البروتوكول في `Connection Host` ثم إضافة باقي البيانات) ثم إنشاء قاعدة البيانات
     - الدخول على `DATABASES` في `settings.py` ثم `ENGINE` ومسح `sqlite3` وإضافة `postgresql` ثم مسح قيمة `NAME` وكتابة اسم القاعدة وإضافة باقي العناصر وقيمتها (`USER`, `PASSWORD`, `HOST`, `PORT`)
     - حفظ التغييرات من خلال سطر الأوامر:
+      - `py manage.py makemigrations`
       - `py manage.py migrate`
+    - قد يطلب تنزيل حزمة `psycopg2` أولا
   - `AUTH_PASSWORD_VALIDATORS`: المتحقق في نوعية كلمات المرور المحددة
 
 - `urls.py`: للتحكم في الروابط ووضع مساراتها
@@ -2178,7 +2195,7 @@ from .forms import ArticleForm
 class ArticleListView(ListView):
     model = Article
     template_name = 'articles/article_list.html'
-    context_object_name = 'articles'
+    context_object_name = 'articles' # الافتراضي object_list
     paginate_by = 10
 
 class ArticleDetailView(DetailView):
@@ -2211,7 +2228,7 @@ class ArticleDeleteView(DeleteView):
 - `DeleteView` - لحذف عنصر
 
 - يوجد خصائص إخرى مثل:
-  - `fields`: للحقول
+  - `fields`: للحقول (بحالة عدم وجود نموذج)
   - `pk_url_name`: للمعرف
 
 ملف `urls.py`:
@@ -2241,6 +2258,235 @@ urlpatterns = [
 - *صعبة التخصيص* في بعض الحالات المعقدة
 - *منحنى تعلم* أعلى
 - *قد تكون بطيئة* في الفهم للوافدين الجدد
+
+---
+
+### reverse vs reverse_lazy vs redirect
+
+#### reverse
+
+*reverse* هي دالة ذكية في `Django` تعطيك *العنوان الكامل لصفحة* بمجرد معرفة *اسمها* في ملف `urls.py`.
+
+مثل دليل الهاتف، فتخيل أنك تريد الاتصال بصديق:
+
+- لديك *اسمه* (مثل "أحمد")
+- تبحث في *دليل الهاتف* (`reverse`) لتحصل على *رقمه* (`URL`)
+
+كيف تعمل؟
+
+في ملف `urls.py`
+
+```python
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('home/', views.home, name='home_page'),
+    path('about/', views.about, name='about_page'),
+]
+```
+
+استخدام `reverse`:
+
+```python
+from django.urls import reverse
+
+# الحصول على العنوان من الاسم
+url = reverse('home_page')    # يعيد: '/home/'
+url = reverse('about_page')   # يعيد: '/about/'
+```
+
+لماذا نستخدم `reverse؟`
+
+1. تجنب الأخطاء في الروابط
+
+   - بدون `reverse`:
+
+   ```python
+   return redirect('/home/')  # إذا غيرت المسار، سينكسر الكود
+   ```
+
+   - مع `reverse`:
+
+   ```python
+   return redirect(reverse('home_page'))  # يعمل دائمًا حتى لو تغير المسار
+   ```
+
+2. ديناميكية مع الباراميترات
+
+  ```python
+  # في urls.py
+  path('user/<int:user_id>/', views.user_profile, name='user_profile')
+
+  # في الكود
+  url = reverse('user_profile', args=[5])  # يعيد: '/user/5/'
+  url = reverse('user_profile', kwargs={'user_id': 5})  # نفس النتيجة
+  ```
+
+#### reverse_lazy
+
+*reverse_lazy* هي نسخة مؤجلة (`lazy`) من الدالة `reverse` في `Django`، تُستخدم بشكل أساسي في تعريفات المستوى الأعلى (مثل تعريفات الفئات) حيث لا يمكن الوصول إلى `URLconf` أثناء التحميل.
+
+استخدامات `reverse_lazy`:
+
+```python
+from django.urls import reverse_lazy
+from django.views.generic import CreateView
+from .models import Post
+
+class PostCreateView(CreateView):
+    model = Post
+    fields = ['title', 'content']
+    success_url = reverse_lazy('post_list')  # هنا لا يمكن استخدام reverse العادي
+```
+
+مميزات `reverse_lazy`:
+
+- *تقيؤ مؤجل*: لا تحسب `URL` حتى تكون هناك حاجة فعلية لها
+- *مناسبة للاستخدام في تعريفات الفئات* (`class attributes`)
+- *تجنب أخطاء التحميل الدائري* في `URLs`
+
+الفرق بين `reverse` و `reverse_lazy`
+
+`reverse` - فورية
+
+```python
+def my_view(request):
+    url = reverse('home_page')  # تحسب الآن!
+    return redirect(url)
+```
+
+`reverse_lazy` - مؤجلة
+
+```python
+from django.urls import reverse_lazy
+
+# تحسب فقط عندما تُستخدم لأول مرة
+success_url = reverse_lazy('home_page')
+```
+
+أمثلة عملية:
+
+مثال 1: في `template`
+
+```html
+<a href="{% url 'home_page' %}">الرئيسية</a>
+<!-- يعادل: <a href="/home/">الرئيسية</a> -->
+```
+
+مثال 2: في `view`
+
+```python
+from django.urls import reverse
+from django.shortcuts import redirect
+
+def my_view(request):
+    # إعادة توجيه إلى صفحة about
+    return redirect(reverse('about_page'))
+```
+
+مثال 3: مع `parameters`
+
+```python
+def show_user(request, user_id):
+    profile_url = reverse('user_profile', args=[user_id])
+    return redirect(profile_url)
+```
+
+متى تستخدم `reverse`؟
+
+1. *inside functions* - داخل الدوال
+2. *when you need the URL now* - عندما تحتاج `URL` فورًا
+3. *in views, models, or any function* - في أي مكان يعمل أثناء التنفيذ
+
+الخلاصة
+
+- *reverse* = "أعطني عنوان هذه الصفحة بمجرد معرفة اسمها"
+- *تفيد في*:
+  - الحفاظ على الكود نظيفًا
+  - تجنب الأخطاء عند تغيير المسارات
+  - العمل مع الروابط الديناميكية
+
+```python
+# بسيط جدًا!
+from django.urls import reverse
+
+url = reverse('page_name')  # أحصل على العنوان من الاسم
+```
+
+#### redirect
+
+*redirect* هي دالة مساعدة تُستخدم في الدوال (`views`) لإعادة توجيه المستخدم إلى `URL` آخر.
+
+استخدامات `redirect`:
+
+```python
+from django.shortcuts import redirect
+from django.http import HttpResponse
+
+def my_view(request):
+    # إعادة توجيه باستخدام اسم URL
+    return redirect('post_list')
+    
+    # أو إعادة توجيه باستخدام مسار URL
+    return redirect('/posts/')
+    
+    # أو إعادة توجيه إلى كائن معين
+    post = Post.objects.get(id=1)
+    return redirect(post)
+```
+
+الفروق الرئيسية بين `reverse_lazy` و `redirect`
+
+| reverse_lazy | redirect |
+|-------------|----------|
+| تُستخدم في تعريفات الفئات والمستوى الأعلى | تُستخدم داخل دوال الـ views |
+| تُرجع كائنًا مؤجلًا | تُرجع HttpResponseRedirect مباشرة |
+| للحصول على URL كسلسلة نصية | لإعادة التوجيه الفوري |
+| مناسبة لـ class-based views | مناسبة لـ function-based views |
+
+أمثلة عملية
+
+مثال باستخدام `reverse_lazy`:
+
+```python
+from django.urls import reverse_lazy
+from django.views.generic import DeleteView
+from .models import Article
+
+class ArticleDeleteView(DeleteView):
+    model = Article
+    success_url = reverse_lazy('article_list')
+```
+
+مثال باستخدام `redirect`:
+
+```python
+from django.shortcuts import redirect
+
+def create_article(request):
+    if request.method == 'POST':
+        # معالجة البيانات
+        return redirect('article_list')
+```
+
+خطأ شائع:
+
+```python
+from django.urls import reverse
+from django.views.generic import CreateView
+
+class MyView(CreateView):
+    success_url = reverse('my_url')  # ❌ خطأ - reverse لا يعمل هنا
+```
+
+الخلاصة
+
+- استخدم *reverse_lazy* عندما تحتاج إلى `URL` في تعريفات الفئات (`class attributes`)
+- استخدم *redirect* عندما تريد إعادة توجيه المستخدم من داخل دالة `view`
+- `reverse_lazy` للتقيؤ المؤجل، `redirect` للإعادة التوجيه الفوري
+
+---
 
 ### تنظيم الروابط
 
@@ -2445,7 +2691,7 @@ urlpatterns = [
 
 #### 2. *إرسال البيانات إلى الخادم (HTTP Request)*
 
-- عند الضغط على زر "إرسال"، تُرسل البيانات عبر **طلب HTTP** (عادةً `POST` أو `GET`).
+- عند الضغط على زر "إرسال"، تُرسل البيانات عبر *طلب HTTP* (عادةً `POST` أو `GET`).
 - يتم إرفاق البيانات في `request.POST` (لنماذج POST) أو `request.GET` (لنماذج GET).
 
 ---
@@ -2579,6 +2825,13 @@ def user_login(request):
 ## التحكم بشكل لوحة الإدارة
 
 - الانتقال إلى `admin.py`:
+
+لإلغاء قاعدة معينة من الصفحة مثلا `Group`:
+
+```python
+from django.contrib.auth.models import Group
+admin.site.unregister(Group)
+```
 
 لتغيير اسم رأس الصفحة:
 
@@ -2725,8 +2978,25 @@ class LoginAdmin(admin.ModelAdmin):
     list_editable = ('name',) # حقول موجودة في list_display وغير موجودة في list_display_link قابلة لتعديل قيمتها (لا تستخدم علاقات ForeignKey أو ManyToManyField)
     fields = ('message',) # الحقول الظاهرة في السجل
 
+    # لجمع حقلين او اكثر بحقل واحد يتم جمعهم عن طريق دالة:
+    def combined_name_and_email(self, obj):
+        return f"{obj.name} - {obj.email}"
+    combined_topic_and_user.short_description = "Combined name and email" # تخصيص اسم الحقل (الافتراضي: اسم دالة (يعني نفس الاسم بالضبط))
+
 # تسجيل النموذج مع الكلاس المخصص للإدارة
 admin.site.register(Contact, LoginAdmin)
+```
+
+لاضافة قاعدة بداخل قاعدة ننشئ فئة مخصصة:
+
+```python
+class InlineTopic(admin.TabularInline): # أو (admin.StackedInline) لإظهارها بالطول
+    model = Topic # اسم الجدول
+    extra = 1 # عدد مرات ظهوره (الافتراضي: 3)، وهو قابل للزيادة في لوحة الإدارة
+
+# يتم ادخال الجدول لجدول آخر من خلال خاصية `inline`
+class BoardAdmin(admin.ModelAdmin):
+    inlines = [InlineTopic]
 ```
 
 - يمكن وضع العناصر داخل `()` أو `[]` أو `{}` أو بدون أقواس
@@ -2734,3 +3004,1485 @@ admin.site.register(Contact, LoginAdmin)
 - لو وضع عنصر واحد داخل `()` يجب إضافة كوما: `('name',)`
 
 ---
+
+## تصدير النماذج لملف CSV من لوحة الإدارة
+
+- تنزيل حزمة التصدير:
+
+```sh
+pip install django-import-export
+```
+
+- إضافة الحزمة إلى `INSTALLED_APPS`: `'import_export'`
+
+- تحديد الجدول المراد تحويله من صفحة المشرف مثلا جدول المواضيع:
+
+```python
+from import_export.admin import ImportExportModelAdmin
+
+@admin.register(Topic)
+class TopicAdmin(ImportExportModelAdmin):
+    pass
+```
+
+- طريقة التسجيل بالديكور هي نفسها الطريقة التقليدية الفرق:
+  - الديكوريتر أبسط وأوضح إذا كان لديك كلاس واحد فقط للموديل.
+  - الطريقة التقليدية مفيدة إذا كنت تريد تسجيل نفس الكلاس لأكثر من موديل (نادر).
+
+- وبهذا سيتم إضافة `IMPORT`, `EXPORT`: لتصدير الجدول مع تحديد نوع الملف
+
+---
+
+## إنشاء مشروع تجريبي
+
+- فكرة المشروع هو إنشاء موقع للمناقشة
+
+- يمكن الوصول إلى المشروع كاملا من [هنا](git@github.com:AHMED-ELBADRYx/Discussion-Board.git)
+
+- الانتقال لمكان المشروع في سطر الأوامر ثم إنشاء البيئة:
+
+```sh
+virtualenv venv
+```
+
+---
+
+- تفعيل البيئة:
+
+```sh
+venv\Scripts\activate
+```
+
+---
+
+- تنزيل جانغو:
+
+```sh
+pip install django
+```
+
+---
+
+- إنشاء مشروع المناقشة:
+
+```sh
+django-admin startproject discussion_board
+```
+
+---
+
+- الإنتقال للمشروع وإنشاء التطبيق:
+
+```sh
+cd discussion_board
+python manage.py startapp boards
+```
+
+---
+
+- الإنتقال إلى `settings.py` ثم تسجيله في `INSTALLED_APPS` بكتابة:
+
+```python
+boards.apps.BoardsConfig
+```
+
+---
+
+- الإنتقال إلى `discussion_board\urls.py` واستيراد `include` من `django.urls` وإضافة الرابط في `urlpatterns`:
+
+```python
+path("", include("boards.urls"))
+```
+
+---
+
+- الانتقال إلى `models.py` لإنشاء الجداول:
+
+  - يتم وضع في القاعدة أربع جداول مهمة:
+    - `Board`: لإنشاء الأقسام (خاصة بالأدمن فقط)
+    - `Topic`: مواضيع تابعة لقسم معين
+    - `Post`: للتفاعل والتعليقات
+    - `User`: للمستخدمين
+
+  - جدول `User` محمل جاهز في `INSTALLED_APPS` في `django.contrib.auth` يعني يمكن استيراده مباشرة دون الحاجة لإنشاء حقوله
+
+- الحقول المضافة لكل كلاس:
+
+  - `Board`:
+    - `title`: --> `Char`
+    - `content`: --> `Char`
+
+    - يمكن إضافة دالة لحساب عدد المشاركات ودالة لتاريخ آخر مشاركة:
+
+      ```python
+      @property
+      def posts_count(self):
+          return sum(topic.posts.count() for topic in self.topics.all())
+
+      @property
+      def last_post_date(self):
+          last_post = Post.objects.filter(
+              topic__board=self
+          ).order_by('-created_at').first()
+          return last_post.created_at if last_post else None
+      ```
+
+  - `Topic`:
+    - `title`: --> `Char`
+    - `board`: --> `ForeignKey Board`
+    - `created_by`: --> `ForeignKey User`
+    - `created_at`: --> `DateTime`
+
+  - `Post`:
+    - `content`: --> `Text`
+    - `topic`: --> `ForeignKey Topic`
+    - `created_by`: --> `ForeignKey User`
+    - `created_at`: --> `DateTime`
+
+  - `User`:
+    - تم استيرادها من `django.contrib.auth`
+
+- العلاقات:
+
+- `Board`: لا يوجد
+- `Topic`: `ForeignKey` --> مع كلا من:
+--> `Board`
+--> `User`
+- `Post`: `ForeignKey` --> مع كلا من -->
+--> `Topic`
+--> `User`
+- `User`: لا يوجد
+
+---
+
+- الانتقال إلى سطلر الأوامر لحفظ التغييرات:
+
+```sh
+python manage.py makemigrations
+python manage.py migrate
+```
+
+---
+
+- إنشاء لوحة الإدارة فنكتب بسطر الأوامر:
+
+```sh
+python manage.py createsuperuser
+```
+
+---
+
+- إضافة الجداول باللوحة في `admin.py`
+
+---
+
+- حفظ التغييرات:
+
+```sh
+python manage.py makemigrations
+python manage.py migrate
+```
+
+---
+
+- إنشاء مجلد `static`
+
+---
+
+- تحميل ملفات `CSS` و `JS` من [هنا](https://getbootstrap.com/docs/5.3/getting-started/download/) ووضعها بمجلد `static`
+  - هذه الملفات تضيف تنسيقات جاهزة فيمكن تحديدها على العنصر من خلال اسم الكلاس الخاص بالتنسيق
+  - طريقة لربطها بالملف الأساسي تكون بهذا الشكل:
+
+    ```html
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    ```
+
+---
+
+- الانتقال إلى `settings.py` لإضافتها:
+
+```python
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+```
+
+- الانتقال لسطر الأوامر لحفظ التغييرات:
+
+```sh
+python manage.py collectstatic
+```
+
+---
+
+- الانتقال للتطبيق وإنشاء ملف `forms.py` لإنشاء النماذج:
+
+```python
+from django import forms
+from django.contrib.auth.forms import UserCreationForm # نموذج للمستخدم مدمج في جانغو
+from django.contrib.auth.models import User # جدول المستخدمين
+from .models import Topic, Post
+
+# نموذج المستخدم
+class CustomUserCreationForm(UserCreationForm):
+    # تخصيص الايميل
+    email = forms.EmailField(
+        required=True,
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control', # للبوتستراب
+            'placeholder': 'Enter your email'
+        })
+    )
+
+    # تحديد الحقول
+    class Meta:
+        model = User
+        fields = ('username', 'email', 'password1', 'password2')
+        
+        # تخصيص حقل username
+        ...
+
+    # تخصيص حقول كلمة المرور
+    def __init__(self, *args, **kwargs):
+      ...
+
+    # حفظ البيانات
+    def save(self, commit=True):
+      ...
+
+# نموذج الموضوع الجديد
+class NewTopicForm(forms.ModelForm):
+    # تحديد وتخصيص حقل العنوان
+    class Meta:
+        ...
+
+    # التحقق من الصحة (عنوان غير فارغ اكثر من 3 حروف بدون مسافات زائدة)
+    def clean_title(self):
+        ...
+
+# نموذج المشاركة الجديدة
+class NewPostForm(forms.ModelForm):
+    # تحديد وتخصيص حقل المحتوى
+    class Meta:
+        ...
+    
+    # التحقق من الصحة (محتوى غير فارغ اكثر من 5 حروف بدون مسافات زائدة)
+    def clean_title(self):
+        ...
+```
+
+### *الفرق بين UserCreationForm و User*
+
+| Aspect | UserCreationForm | User |
+|--------|------------------|------|
+| *النوع* | Form | Model |
+| *الغرض* | معالجة إدخال المستخدم | تمثيل البيانات في DB |
+| *الاستخدام* | في القوالب والطلبات | في الاستعلامات والعمليات |
+| *المحتوى* | حقول + تحقق صحة | حقول + علاقات |
+| *التوريث* | يرث من `forms.Form` | يرث من `models.Model` |
+| *طريقة الحفظ* | `form.save()` | `user.save()` أو `User.objects.create()` |
+
+مثال يوضح العلاقة بينهما:
+
+```python
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.models import User
+
+# استخدام النموذج لإنشاء مستخدم
+form = UserCreationForm(data={
+    'username': 'john',
+    'password1': 'securepassword123',
+    'password2': 'securepassword123'
+})
+
+if form.is_valid():
+    user = form.save()  # هذا ينشئ كائن User في قاعدة البيانات
+    print(user.username)  # 'john' - هذا كائن من نموذج User
+```
+
+*الخلاصة*:
+
+- `UserCreationForm` هو *الواجهة* لإنشاء مستخدم
+- `User` هو *نموذج البيانات* نفسه الذي يتم تخزينه في قاعدة البيانات
+
+---
+
+- الانتقال للتطبيق وإنشاء ملف الروابط `urls.py` لإضافة روابط دوال العرض
+
+---
+
+- إنشاء مجلد `templates` بالخارج لإنشاء ملفات `html`
+
+---
+
+- الانتقال إلى `settings.py` واستيراد نظام التشغيل:
+
+```python
+import os
+```
+
+- إضافة المجلد إلى `TEMPLATES\DIRS`:
+
+```python
+os.path.join(BASE_DIR, 'templates')
+```
+
+---
+
+- الانتقال إلى `views` لإضافة دوال العرض
+
+---
+
+- إضافة قائمة اللوحة كصفحة رئيسية في `views`:
+
+  - `board_list(request)` (`FBV`):
+
+    - استعلام القاعدة:
+      - `annotate()`: إضافة حقول محسوبة إلى النتائج
+      - `total_posts=Count('topics__posts')`: حساب العدد الإجمالي للمشاركات في جميع مواضيع اللوحة
+      - `total_topics=Count('topics')`: حساب عدد المواضيع في كل لوحة
+      - `.all()`: جلب جميع اللوحات (يمكن حذفه لأنه افتراضي)
+      - `.order_by('id')`: ترتيب اللوحات حسب الـ `ID` تصاعدياً
+
+    - التقسيم إلى صفحات:
+      - `Paginator(boards, 10)`: إنشاء كائن `Paginator` يعرض 10 لوحات لكل صفحة
+      - `request.GET.get('page')`: الحصول على رقم الصفحة المطلوبة من `URL`
+
+    - معالجة الصفحات:
+      - `paginator.page(page)`: محاولة الحصول على الصفحة المطلوبة
+      - `PageNotAnInteger`: إذا كان رقم الصفحة ليس رقماً (مثل نص)، يعرض الصفحة الأولى
+      - `EmptyPage`: إذا كان رقم الصفحة أكبر من العدد الإجمالي، يعرض آخر صفحة
+
+    - العرض
+
+  - `BoardListView(ListView)` (`CBV`):
+    - إضافة السمات: `model`, `context_object_name`, `template_name`, `paginate_by`, `ordering`
+    - إضافة دالة لتخصيص استعلام قاعدة البيانات
+    - إضافة دالة لتوفير هيكل قابل للتوسيع من خلال `Keyword Arguments`
+
+### PAGINATION
+
+- إنشاء ملف لتقسيم الصفحات *_pagination.html*:
+
+    ```html
+    {% if items.has_other_pages %}
+        
+        <!-- روابط الصفحات السابقة-->
+        {% if items.has_previous %}
+            <a href="?{% if request.GET.sort %}sort={{ request.GET.sort }}&{% endif %}page=1">« الأولى</a>
+            <a href="?{% if request.GET.sort %}sort={{ request.GET.sort }}&{% endif %}page={{ items.previous_page_number }}">‹ السابق</a>
+        {% endif %}
+
+        <!-- أرقام الصفحات -->
+        {% for num in items.paginator.page_range %}
+
+            <!-- الصفحة الحالية (بدون رابط) -->
+            {% if items.number == num %}
+                {{ num }}
+            
+            <!-- الصفحات السابقة (مع رابط) -->
+            {% elif num > items.number|add:'-3' and num < items.number|add:'3' %}
+                <a href="?{% if request.GET.sort %}sort={{ request.GET.sort }}&{% endif %}page={{ num }}">{{ num }}</a>
+            {% endif %}
+        {% endfor %}
+
+        <!-- الصفحات التالية (مع رابط) -->
+        {% if items.has_next %}
+            <a href="?{% if request.GET.sort %}sort={{ request.GET.sort }}&{% endif %}page={{ topics.next_page_number }}"></a>
+            <a href="?{% if request.GET.sort %}sort={{ request.GET.sort }}&{% endif %}page={{ items.paginator.num_pages }}"></a>
+        {% endif %}
+    {% endif %}
+    ```
+
+- مثلا لنفترض أن لدينا 15 صفحة والصفحة الحالية هي 7 فتكون المخرجات:
+
+```sh
+« الأولى ‹ السابق 4 5 6 [7] 8 9 10 التالي › الأخيرة »
+```
+
+- *الصفحات المعروضة*: 4, 5, 6, 7, 8, 9, 10 (±3 من الصفحة 7)
+- *الصفحة 7*: بدون رابط لأنها الصفحة الحالية
+- *روابط التنقل*: الأولى، السابق، التالي، الأخيرة
+
+- المتغيرات المستخدمة
+
+| المتغير | الوصف |
+|---------|-------|
+| `is_paginated` | هل هناك تقسيم للصفحات؟ |
+| `page_obj` | كائن الصفحة الحالية |
+| `page_obj.has_previous` | هل توجد صفحة سابقة؟ |
+| `page_obj.previous_page_number` | رقم الصفحة السابقة |
+| `page_obj.has_next` | هل توجد صفحة تالية؟ |
+| `page_obj.next_page_number` | رقم الصفحة التالية |
+| `page_obj.number` | رقم الصفحة الحالية |
+| `page_obj.paginator.page_range` | قائمة بأرقام جميع الصفحات |
+| `page_obj.paginator.num_pages` | عدد الصفحات الإجمالي |
+
+- عرض القائمة في هيكل القالب:
+
+  - يمكن عرض عدد المواضيع والمشاركات الموجودة في `views` من خلال متغير حلقة قيمة قاموس البيانات:
+
+  ```html
+  {{ board.total_posts }}
+  {{ board.total_topics }}
+  ```
+
+  - عرض تاريخ آخر بوست الموجود في دالة `models`:
+
+  ```html
+  {% if board.last_post_date %}
+      {{ board.last_post_date|date:"Y-m-d H:i" }}
+  ```
+
+  - إضافة ملف `_pagination.html` لعرض روابط التصفح بين الصفحات (`pagination`)
+
+    ```html
+    {% include "boards/includes/_pagination.html" with items=page_obj %}
+    ```
+
+---
+
+### كيفية إنشاء الكائن من خلال سطر الأوامر
+
+- مثلا إنشاء موضوع من أحد عناصر اللوحة التي يتم إنشاءها بلوحة الإدارة مثل `Web programming`:
+
+```sh
+py manage.py shell
+from boards.models import Board
+board = Board(title='Web programming', content='This board will speak about all web programming')
+board.save()
+board.id  # الاستعلام عن معرف
+board.title  # الاستعلام عن حقل عنوان الطائن
+Board.objects.all()  # الاستعلام عن كل الكائنات
+exit()  # خروج
+```
+
+---
+
+### كيفية إنشاء عدد من الكائنات من خلال سطر الأوامر
+
+- مثلا إنشاء 100 موضوع من خلال سطر الأوامر:
+
+```sh
+python manage.py shell
+from django.contrib.auth.models import User
+from boards.models import Board, Topic
+import random
+from django.utils import timezone
+
+# الحصول على المستخدمين واللوحات المتاحة
+users = User.objects.all()
+boards = Board.objects.all()
+
+if not users.exists():
+    print("لا يوجد مستخدمين. يرجى إنشاء مستخدمين أولاً.")
+elif not boards.exists():
+    print("لا يوجد لوحات. يرجى إنشاء لوحات أولاً.")
+else:
+    # إنشاء 100 topic عشوائي
+    for i in range(100):
+        user = random.choice(users)
+        board = random.choice(boards)
+        
+        topic = Topic.objects.create(
+            title=f"Topic التجريبي {i+1} - {board.title}",
+            board=board,
+            created_by=user,
+            created_at=timezone.now(),
+            views=random.randint(0, 1000)
+        )
+        print(f"تم إنشاء topic: {topic.title}")
+    
+    print("تم إنشاء 100 topic بنجاح!")
+
+# الخروج من shell بعد الانتهاء
+exit()
+```
+
+---
+
+- إضافة تفاصيل اللوحة في `views`:
+
+  - `board_detail(request, board_id)` (`FBV`):
+
+    - `get_object_or_404()`: جلب الكائن
+
+    - `request.GET.get('sort', 'newest')`: جلب معامل الفرز من `URL` (الافتراضي `'newest'`)
+
+    - تحسين أداء الجلب:
+      - `select_related`: علاقة ManyToOne
+      - `prefetch_related`: علاقة ManyToMany
+
+    - تطبيق الفرز:
+      - `newest`: `-created_at` (الأحدث أولاً)
+      - `oldest`: `created_at` (الأقدم أولاً)
+
+    - تقسيم ومعالجة الصفحات:
+
+    - فتكون البيانات الممررة للقالب:
+
+      - `board`: كائن اللوحة
+      - `topics`: كائن الصفحة الحالية من المواضيع
+      - `sort_param`: معامل الفرز الحالي للاستخدام في القالب
+
+- عرض التفاصيل في هيكل القالب:
+
+  - التحقق من المستخدم:
+
+  ```html
+  {% if user.is_authenticated %}
+      
+      <a href="{% url 'new_topic' board.id %}">New Topic</a> <!-- عرض رابط إنشاء موضوع جديد للمستخدمين المسجلين -->
+
+  {% else %}
+      
+      <a href="{% url 'login' %}?next={{ request.path }}">Login to Post</a> <!-- عرض رابط تسجيل الدخول للزوار -->
+      <!-- `?next={{ request.path }}`: يحفظ الصفحة الحالية لإعادة التوجيه بعد التسجيل -->
+
+  {% endif %}
+  ```
+
+  - عرض محتوى وصف اللوحة إذا كان موجوداً:
+
+  ```html
+  {% if board.content %}
+      {{ board.content|default:"No content available" }}
+  {% endif %}
+  ```
+
+  - عرض العدد الإجمالي للمواضيع في اللوحة (ليس فقط في الصفحة الحالية):
+
+  ```html
+  Topics: {{ topics.paginator.count }}
+  ```
+
+  - خيارات الفرز:
+
+  ```html
+  <input type="radio" name="sort" id="newest" value="newest" autocomplete="off"
+  {% if not request.GET.sort or request.GET.sort == 'newest' %}checked{% endif %}>
+  <label for="newest">Newest</label>
+
+  <input type="radio" name="sort" id="oldest" value="oldest" autocomplete="off"
+  {% if request.GET.sort == 'oldest' %}checked{% endif %}>
+  <label for="oldest">Oldest</label>
+  ```
+
+  - بحالة وجود مواضيع:
+
+  ```html
+  {% if topics %}
+
+      <!-- أيقونات حسب حالة الموضوع -->
+      {% if request.GET.sort == 'oldest' %}
+          <i></i>
+      {% else %}
+          <i></i>
+      {% endif %}
+
+      <!-- عرض قائمة المواضيع -->
+      {% for topic in topics %}
+          <a href="{% url 'topic_detail' board.id topic.id %}"></a>
+          
+          <!-- أيقونات حسب شعبية الموضوع -->
+          {% if topic.posts.count > 10 %}
+              <i title="Hot topic"></i>
+          {% elif topic.posts.count > 5 %}
+              <i title="Popular topic"></i>
+          {% else %}
+              <i title="Normal topic"></i>
+          {% endif %}
+
+          <!-- الانتقال لصفحة تفاصيل الموضوع من خلال عنوانه -->
+          <a href="{% url 'topic_detail' board.id topic.id %}">{{ topic.title }}</a>
+          
+          <!-- علامة "New" للمواضيع بدون مشاركات -->
+          {% if topic.posts.count == 0 %}
+            New
+          {% endif %}
+          
+          <!-- إحصائيات الموضوع -->
+          {{ topic.posts.count }}
+          {{ topic.views }}
+          {{ topic.created_by.username }}</
+          
+          <!-- تاريخ الإنشاء -->
+          <small
+          title="{{ topic.created_at }}">
+              {{ topic.created_at|date:"M j, Y" }} <!-- التاريخ: Dec 15, 2023 -->
+              <br>
+              {{ topic.created_at|date:"g:i A" }} <!-- الوقت: 2:30 PM -->
+          </small>
+      {% endfor %}
+  ```
+
+  - إضافة ملف `_pagination.html` لتقسيم إلى صفحات (`Pagination`):
+
+    ```html
+    {% include "boards/includes/_pagination.html" with items=topics %}
+    ```
+
+  - بحالة عدم وجود مواضيع
+
+  ```html
+  {% else %}
+      {% if user.is_authenticated %}
+          
+          <!-- عرض رسالة تشجيعية لإنشاء أول موضوع للمسجلين -->
+          <a href="{% url 'new_topic' board.id %}">Create First Topic</a>
+      
+      {% else %}
+
+          <!-- نقل الغير مسجلين لصفحة تسجيل الدخول -->
+          <a href="{% url 'login' %}?next={{ request.path }}">Login to Create Topic</a>
+      {% endif %}
+  {% endif %}
+  ```
+
+---
+
+- إضافة موضوع جديد في `views`:
+
+  - `new_topic(request, board_id)` (`FBV`):
+
+    - `@login_required`: تقييد الوصول إلى المستخدمين المسجلين فقط
+
+    - جلب اللوحة
+
+    - إنشاء نموذج مع البيانات المرسلة من نموذج الموضوع الجديد في `forms` (مع التأكد من أن الطلب `POST`)
+
+      - التحقق من صحة النموذج
+
+        - `try: with transaction.atomic()`: معاملة ذرية (`Atomic Transaction`) لمنع إنشاء موضوع غير مكتمل إذا فشلت بعض العمليات أما إذا كان مكتملا فيتم:
+          - `form.save(commit=False)`: إنشاء كائن `Topic` من النموذج دون حفظه في قاعدة البيانات
+          - `topic.board = board`: ربط الموضوع باللوحة الحالية
+          - `topic.created_by = request.user`: تعيين المستخدم الحالي كمنشئ الموضوع
+          - `topic.save()`: حفظ الموضوع النهائي في قاعدة البيانات
+
+          - رسالة النجاع وإعادة التوجيه إلى صفحة تفاصيل الموضوع الجديد لإضافة التعليقات
+
+        - معالجة الأخطاء لو كان الموضوع غير مكتمل
+
+      - معالجة النموذج غير الصالح
+
+    - معالجة طلب `GET` (عرض النموذج)
+
+- إنشاء ملف لعرض الأخطاء وملف لعرض حقول النموذج
+
+- الملف الأول: عرض *الأخطاء العامة (_form_errors.html)*
+
+  - `form.non_field_errors` = الأخطاء التي لا تخص حقل معين، بل النموذج ككل.
+
+  - إذا كانت هناك أخطاء:
+    - يتم المرور على كل خطأ باستخدام `{% for error in form.non_field_errors %}` ويُعرض كنص عادي.
+
+### WIDGET TWEAKS
+
+- تنزيل حزمة `widget tweaks` لتجعل تخصيص شكل الحقول (`attributes`) في القوالب أسهل وأسرع وأكثر مرونة بإضافة الكلاسات الخاصة بـ `Bootstrap` مثل `form-control` فننتقل لسطر الأوامر (يجب أن تكون البيئة الافتراضية مفعلة):
+
+```sh
+pip3 install django-widget-tweaks
+```
+
+- إضافتها إلى `settings.py\INSTALLED_APPS`: `'widget_tweaks'`
+
+- الملف الثاني: عرض *حقول النموذج مع التحقق (_form_fields.html)*
+
+1. *تحميل مكتبة widget_tweaks*
+
+2. *التكرار على الحقول*
+
+3. *عرض الاسم (Label)*
+
+   - يعرض اسم الحقل (`field.label`)
+   - إذا الحقل مطلوب (`required`): يضع نجمة `*`
+
+4. *التعامل مع الأخطاء*
+
+   - إذا كان عند الحقل أخطاء:
+
+     - يضاف له كلاس `Bootstrap` *`is-invalid`* (لون أحمر)
+     - يعرض الأخطاء تحت الحقل داخل `invalid-feedback`
+
+5. *لو الحقل صحيح أو فارغ*
+
+   - إذا *النموذج تم إرساله (`is_bound`)* والحقل يحتوي قيمة صحيحة: يضاف كلاس *`is-valid`* (لون أخضر).
+   - إذا الحقل لم يُملأ أو النموذج لسه ما أُرسل: يبقى بكلاس عادي *`form-control`*
+
+6. *عرض المساعدة (help_text)*
+
+   - إذا الحقل يحتوي *نص مساعدة* (`help_text`) ولم يكن فيه خطأ: يعرض المساعدة أسفل الحقل.
+
+- عرض الموضوع بهيكل القالب:
+
+  - عرض الحقول ومعالجة الأخطاء:
+
+    ```html
+    <form method="post" novalidate>
+        {% csrf_token %}
+        
+        {% include "includes/_form_errors.html" %}
+        {% include "includes/_form_fields.html" %}
+        
+        <button type="submit" >Add Topic</button>
+    </form>
+    ```
+
+  - زر العودة لصفحة التفاصيل
+
+    ```html
+    <a href="{% url 'board_detail' board.id %}">Back to Board</a>
+    ```
+
+  - عرض عدد المواضيع:
+
+    ```html
+    Topics: {{ topics.paginator.count }}
+    ```
+
+  - بحالة وجود مواضيع:
+
+    ```html
+    {% if topics %}
+        
+    <!-- عرض قائمة المواضيع -->
+        {% for topic in topics %}
+            <a href="{% url 'topic_detail' board.id topic.id %}">{{ topic.title }}</a> <!-- الانتقال لصفحة تفاصيل الموضوع من خلال عنوانه -->
+
+            <!-- إحصائيات الموضوع -->
+            {{ topic.posts.count }}
+            {{ topic.created_by.username }}
+            {{ topic.created_at|date:"M j, Y" }}
+            {{ topic.views }}
+    ```
+
+    - إضافة ملف `_pagination.html` لتقسيم الصفحات (`Pagination`):
+
+    ```html
+    {% include "boards/includes/_pagination.html" with items=topics %}
+    ```
+
+---
+
+- إضافة تفاصيل الموضوع لإضافة التعليقات في `views`:
+  
+  - `topic_detail(request, board_id, topic_id)` (`FBV`):
+
+    - جلب الموضوع مع التحسينات:
+      - `get_object_or_404()`: التأكد من وجود الموضوع أو إرجاع 404
+        - `select_related('board', 'created_by')`: تحسين الأداء بجذب البيانات المرتبطة (لوحة الموضوع ومنشئه)
+        - `board__pk=board_id`: التأكد أن الموضوع ينتمي للوحة الصحيحة
+
+    - زيادة عداد المشاهدات ومنع تكرار عد المشاهدات من نفس المستخدم في نفس الجلسة:
+      - `F('views') + 1`: زيادة آمنة بدون مشاكل التزامن
+      - `refresh_from_db()`: تحديث البيانات من قاعدة البيانات
+      - `request.session[session_key] = True`: تأكيد أن المستخدم قد شاهد الموضوع
+
+    - جلب المشاركات مع التحسين
+
+    - التقسيم إلى صفحات (`Pagination`)
+
+    - معالجة إنشاء مشاركة جديدة (`POST Request`):
+      - التحقق من تسجيل الدخول
+      - التحقق من صحة النموذج
+      - حفظ المشاركة بشكل آمن (معاملة ذرية)
+      - إعادة التوجيه مع رسائل نجاح/خطأ
+
+    - معالجة طلب `GET` (عرض النموذج)
+
+    - العرض النهائي
+
+- عرض تفاصيل الموضوع بهيكل القالب:
+
+  - عرض صاحب الموضوع وتاريخ الإنشاء:
+
+  ```html
+  {{ topic.created_by.username }}
+  {{ topic.created_at|date:"Y-m-d H:i" }}
+  ```
+
+  - عرض نموذج المشاركة للمستخدمين المسجلين
+
+  ```html
+  {% if user.is_authenticated %}
+      <form method="post" novalidate>
+          {% csrf_token %}
+          
+          {% include "includes/_form_errors.html" %}
+          {% include "includes/_form_fields.html" %}
+          
+          <button type="submit">Add Post</button>
+      </form>
+  ```
+  
+  - عرض رابط التسجيل للغير مسجلين مع حفظ الصفحة للعودة إليها بعد التسجيل
+
+  ```html
+  {% else %}
+      <a href="{% url 'login' %}?next={{ request.path }}">Login to Post</a>
+  {% endif %}
+  ```
+
+  - زر العودة لصفحة المواضيع
+
+  ```html
+  <a href="{% url 'board_detail' topic.board.pk %}">Back to Board</a>
+  ```
+
+  - عرض المشاركات للمستخدمين المسجلين
+
+  ```html
+  {% if user.is_authenticated %}
+      {% for post in posts %}
+          {{ post.created_by.username }}
+          {{ post.created_at|date:"Y-m-d H:i" }}
+          
+          <!-- عرض تاريخ التعديل -->
+          {% if post.updated_by %}
+            (edited at {{ post.updated_at|date:"Y-m-d H:i" }})
+          {% endif %}
+
+          <!-- عرض زر التعديل لصاحب المشاركة -->
+          {% if user == post.created_by %}
+              <a href="{% url 'post_edit' post.pk %}">Edit</a>
+          {% endif %}
+
+          <!-- عرض محتوى المشاركة -->
+          {{ post.content }}
+  ```
+
+  - إضافة ملف تقسيم الصفحة:
+
+  ```html
+  {% include "boards/includes/_pagination.html" with items=posts %}
+  ```
+
+  - عرض زر التسجيل لغير المسجلين
+
+  ```html
+  {% else %}
+      <a href="{% url 'login' %}?next={{ request.path }}">login</a>
+  {% endif %}
+  ```
+
+---
+
+- إضافة تعديل التعليق في `views`
+
+  - `PostUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView)` (`CBV`):
+
+    - الوراثة:
+      - `LoginRequiredMixin`: يتطلب تسجيل الدخول
+      - `UserPassesTestMixin`: يتحقق من صلاحيات المستخدم
+      - `UpdateView`: عرض مخصص للتعديل
+
+    - إضافة السمات (`Attributes`): `model`, `form_class`, `template_name`, `context_object_name`
+
+    - التحقق إذا كان المستخدم الحالي هو منشئ المشاركة
+
+    - معالجة عدم وجود الصلاحية بإضافة رسالة خطأ إذا لم يكن لدى المستخدم الصلاحية
+
+    - تحديد رابط النجاح
+
+    - معالجة النموذج الصالح
+      - `form.instance.updated_by = self.request.user`: تعيين المستخدم الحالي كمعدل المشاركة
+      - `messages.success()`: إضافة رسالة نجاح
+      - `super().form_valid(form)`: الاستمرار في المعالجة الافتراضية
+
+- عرض تعديل التعليق بهيكل القالب:
+
+  - عرض عنوان المشاركة الأساسي كرابط:
+
+  ```html
+  <a href="{% url 'topic_detail' post.topic.board.id post.topic.id %}">{{ post.topic.title }}</a>
+  ```
+
+  - إضافة نموذج الحقل لتعديله:
+
+  ```html
+  <form method="post" novalidate>
+      {% csrf_token %}
+      
+      {% include "includes/_form_errors.html" %}
+      {% include "includes/_form_fields.html" %}
+      
+      <button type="submit">Update Post</button>
+      
+      <a href="{% url 'topic_detail' post.topic.board.id post.topic.id %}">Cancel</a>
+  </form>
+  ```
+
+---
+
+- إنشاء تطبيق للحساب:
+
+```sh
+django-admin startapp accounts
+```
+
+---
+
+- تعريفه في `settings.py\INSTALLED_APPS`:
+
+```sh
+'accounts.apps.AccountsConfig'
+```
+
+---
+
+- إضافته إلى `discusssion_board\urls.py`:
+
+```python
+path("accounts/", include("accounts.urls"))
+```
+
+---
+
+- الانتقال للتطبيق وإنشاء ملف الروابط `urls.py` والانتقال إليه لإضافة روابط دوال العرض
+
+---
+
+- إنشاء `forms.py` لوضع كلاسين:
+  - `CustomUserCreationForm`
+  - `UserUpdateForm`
+
+---
+
+- الانتقال إلى `views` لإنشاء دوال العرض:
+
+---
+
+- إنشاء دالة تسجيل الدخول لمستخدم سابق:
+
+  - `login_view(request)` (`FBV`):
+  
+    - `@never_cache`: يمنع المتصفح من التخزين فيضمن أن المستخدم سيحصل دائمًا على صفحة تسجيل دخول جديدة عند الزيارة
+
+    - تعريف الدالة والتحقق من المصادقة
+
+      - إذا كان المستخدم مسجلاً دخوله بالفعل، يعرض رسالة ويوجهه مباشرة إلى لوحة القوائم
+
+      - تحديد الصفحة التالية من خلال الحصول على معامل `next` من `URL` أو بيانات النموذج أو يستخدم `'board_list'` كصفحة افتراضية إذا لم يكن موجودًا
+
+      - معالجة طلب `POST` (تسجيل الدخول)
+        - إذا كان النموذج صالحًا، يسجل دخول المستخدم
+        - `update_session_auth_hash` يحافظ على جلسة المستخدم عند تغيير كلمة المرور
+        - يعرض رسالة ترحيب ويوجه إلى الصفحة المطلوبة
+        - معالجة الأخطاء بإعادة عرض النموذج مع رسالة خطأ
+
+      - معالجة طلب `GET` (عرض صفحة التسجيل)
+
+- إنشاء هيكل القالب
+
+```html
+<form method="post" novalidate>
+    {% csrf_token %}
+    
+    <!-- حمل قيمة الصفحة التي يجب توجيه المستخدم إليها بعد تسجيل الدخول الناجح بدلا من الصفحة الافتراضية -->
+    <input type="hidden" name="next" value="{{ next }}">
+
+    {% include "includes/_form_errors.html" %}
+    {% include "includes/_form_fields.html" %}
+
+    <button type="submit">Login</button>
+</form>
+
+<!-- إضافة خيار رابط صفحة التسجيل لمستخدم جديد -->
+<a href="{% url 'register' %}">Register here</a>
+```
+
+---
+
+- إنشاء دالة التسجيل لمستخدم جديد:
+
+  - `register_view(request)` (`FBV`):
+
+    - إضافة ديكوريتور `@never_cache`
+
+    - تعريف الدالة والتحقق من المصادقة
+
+    - معالجة طلب `POST` (تسجيل جديد) باستخدام نموذج `CustomUserCreationForm` المخصص
+
+      - معالجة بعد التسجيل الناجح
+        - إذا كان الحساب نشطًا: يسجل دخول المستخدم تلقائيًا ويعرض رسالة ترحيب
+        - إذا كان الحساب غير نشط: يعرض رسالة تفيد بانتظار التفعيل (مفيد لنظام الموافقة على الحسابات)
+        - في كلا الحالتين، يتم التوجيه إلى `board_list`
+
+      - معالجة الأخطاء
+
+    - معالجة طلب `GET` (عرض صفحة التسجيل)
+
+- إنشاء هيكل القالب:
+
+```html
+<form method="post" novalidate>
+    {% csrf_token %}
+    
+    {% include "includes/_form_errors.html" %}
+    {% include "includes/_form_fields.html" %}
+    
+    <button type="submit">Create Account</button>
+</form>
+
+<!-- إضافة خيار رابط صفحة تسجيل الدخول لمستخدم موجود -->
+<a href="{% url 'login' %}">Login here</a>
+```
+
+---
+
+- إنشاء دالة تسجيل الخروج:
+
+  - `logout_view(request)` (`FBV`):
+  
+    - الديكورات (`Decorators`):
+      - `@login_required`: تطلب أن يكون المستخدم مسجلاً دخولاً للوصول إلى هذه الصفحة
+      - `@require_http_methods(["GET", "POST"])`: تقصر الطرق المسموحة على `GET` و `POST` فقط
+      - `@never_cache`: تمنع المتصفح من تخزين هذه الصفحة في الكاش
+
+    - منطق التسجيل الخروج:
+      - يتم تنفيذ تسجيل الخروج فقط عند استلام طلب `POST`
+      - حفظ اسم المستخدم: يتم حفظ الاسم قبل تسجيل الخروج لأن `request.user` يصبح مجهولاً بعد `logout()`
+      - إضافة رسالة تأكيد للمستخدم
+      - إعادة توجيه المستخدم إلى صفحة تسجيل الدخول
+
+    - عند طلب `GET`، يتم عرض قالب تأكيد تسجيل الخروج (`logout.html`)
+
+- عرض زر تسجيل الخروج بأي مكان مثلا في `NAVBAR`:
+
+```html
+<a href="{% url 'logout' %}">Logout</a>
+```
+
+- إنشاء هيكل القالب:
+
+```html
+<form method="post" action="{% url 'logout' %}">
+    {% csrf_token %}
+    <button type="submit">Yes, Logout</button>
+</form>
+
+<a href="{% url 'board_list' %}">Cancel</a>
+```
+
+---
+
+- إضافة رابط تغيير لتغيير الباسوورد ورابط التأكيد المدمجين بصفحة الروابط
+
+- عرض زر تغيير الباسوورد بأي مكان مثلا في `NAVBAR`:
+
+```html
+<a href="{% url 'password_change' %}">Change Password</a>
+```
+
+- إنشاء هيكل القالب لصفحة تغببر الباسوورد:
+
+```html
+<form method="post" novalidate>
+    {% csrf_token %}
+    
+    {% include "includes/_form_errors.html" %}
+    {% include "includes/_form_fields.html" %}
+
+    <button type="submit" >Change Password</button>
+
+    <a href="{% url 'board_list' %}">Cancel</a>
+```
+
+- إنشاء هيكل القالب لصفحة التأكيد:
+
+```html
+<h5>Password Changed Successfully!</h5>
+<a href="{% url 'board_list' %}">Go to Home</a>
+```
+
+---
+
+- إنشاء كلاس عرض تغيير اسم المستخدم والإيميل:
+
+  - `UserUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView)` (`CBV`):
+
+    - الوراثة (`Inheritance`):
+      - `LoginRequiredMixin`: يضمن أن المستخدم يجب أن يكون مسجلاً دخولاً للوصول إلى هذه الصفحة
+      - `SuccessMessageMixin`: يضيف إمكانية عرض رسائل نجاح بعد العملية
+      - `UpdateView`: View مخصصة لعرض وتحديث بيانات نموذج معين (Model)
+
+    - السمات (`Attributes`): `model`, `form_class`, `template_name`, `success_message`, `success_url`
+
+    - الدالة المخصصة (`get_object`):
+      - تجاوز الدالة الافتراضية: بدلاً من الحصول على الكائن من خلال المعامل في `URL`
+      - إرجاع المستخدم الحالي: تُرجع كائن المستخدم المسجل دخوله حالياً
+      - الأمان: يضمن أن كل مستخدم يمكنه فقط تحديث بياناته الشخصية
+
+- عرض زر تغيير البروفايل بأي مكان مثلا في `NAVBAR`:
+
+```html
+<a href="{% url 'profile_update' %}">Edit Profile</a>
+```
+
+- إنشاء هيكل القالب:
+
+```html
+<form method="post" novalidate>
+    {% csrf_token %}
+    
+    {% include "includes/_form_errors.html" %}
+    {% include "includes/_form_fields.html" %}
+
+    <button type="submit">Update Profile</button>
+    <a href="{% url 'board_list' %}">Cancel</a>
+</form>
+```
+
+---
+
+## API
+
+- ما هي واجهة برمجة التطبيقات (`API`)؟
+
+  - `API` هو اختصار لـ `Application Programming Interface`، أي: واجهة برمجة التطبيقات.
+  - بعبارة بسيطة: هو باب أو وسيط يسمح لتطبيقٍ ما أو موقعٍ ما أن يتواصل مع تطبيق أو موقع آخر، للحصول على بيانات أو تنفيذ وظائف محددة، دون الحاجة لمعرفة كيف بُني ذلك التطبيق من الداخل.
+
+- الفرق بين واجهة `HTML` وواجهة `API`
+
+  - عندما نزور موقعًا عاديًا، السيرفر يرسل لنا صفحة `HTML` ليراها المستخدم في المتصفح.
+
+  - أما عند زيارة رابط `API`، السيرفر لا يعطينا صفحة، بل يعطينا بيانات خام (عادةً بصيغة `JSON`) يمكن لأي برنامج أو تطبيق استهلاكها وإعادة عرضها بالشكل الذي يريده.
+
+- مثلا
+
+  - إذا كان عندك موقع يعرض مقالات:
+
+    - صفحة الموقع: تعرض المقالات بشكل مرتب (`HTML` + `CSS`).
+
+    - رابط الـ `API`: يرجع نفس المقالات لكن في صيغة بيانات منظمة مثل:
+
+    ```json
+    [
+    {"id": 1, "title": "أول مقالة", "content": "هذا نص تجريبي"},
+    {"id": 2, "title": "ثاني مقالة", "content": "مقال آخر"}
+    ]
+    ```
+
+    - بهذه الطريقة، يمكن لتطبيق موبايل أو موقع آخر أن يستهلك نفس البيانات ويعرضها بتصميمه الخاص.
+
+- الفرق بين الـ `API` والاستضافة
+
+  - الاستضافة: مكان تخزن فيه موقعك أو تطبيقك ليكون متاحًا على الإنترنت (مثل الشقة التي فيها كل ملفاتك).
+
+  - الـ `API`: واجهة أو خدمة داخل الموقع المستضاف، تسمح لتطبيقات أخرى أن تأخذ بياناتك أو تستعمل وظائفك بطريقة منظمة (مثل باب خدمة خاص للمطعم يسمح لتطبيقات الدليفري بطلب الطعام).
+
+- لماذا نستخدم `API`؟
+
+  1. إعادة استخدام البيانات: بدل أن يكرر كل تطبيق نفس الجهد، يستعمل البيانات من مصدر واحد.
+
+  2. التكامل بين الأنظمة: مثل ربط موقعك مع خدمة دفع إلكتروني أو خدمة طقس.
+
+  3. تعدد الواجهات: يمكن لموقعك أن يُستهلك من متصفح، أو من تطبيق موبايل، أو حتى من برامج أخرى، وكلها تعتمد على نفس الـ `API`.
+
+- الخلاصة
+
+  - الـ `API` ليس استضافة، وليس مجرد تضمين (`Embedding`) لصفحة أو فيديو.
+هو أشبه بـ جسر للتواصل بين التطبيقات:
+
+  - بدلاً من أن تعرض صفحة `HTML` عادية للمستخدم، تعرض بيانات خام (مثل `JSON`).
+
+  - هذه البيانات يمكن لمواقع أو تطبيقات أخرى أن تستهلكها وتعيد عرضها أو تبني عليها خدمات جديدة.
+
+---
+
+## تطبيق API على المشروع
+
+- المشروع سيلعب دور `BACK-END` الذي ينشئ البيانات ويستقبلها `FORNT-END` لمشروع آخر
+
+---
+
+- تنزيل `REST FRAMEWORK`:
+
+```sh
+pip3 install djangorestframework
+```
+
+---
+
+- إضافتها إلى `INSTALLED_APPS` في الإعدادات
+
+```python
+'rest_framework`
+```
+
+---
+
+- بدلا من إرجاع البيانات على شكل `TEMPLATE` يتم إرجاعها على شكل `JSON` مثلا لإرجاع بيانات دالة `boatd_list`:
+
+```python
+from django.http import JsonResponse
+
+def board_list(request):
+    ...
+    data = {
+        "Results": [
+            {
+                "pk": board.pk,
+                "title": board.title,
+                "content": board.content,
+                "total_posts": board.total_posts,
+                "total_topics": board.total_topics,
+            }
+            for board in boards
+        ],
+        "num_pages": boards.paginator.num_pages,
+        "current_page": boards.number,
+    }
+    return JsonResponse(data)
+```
+
+---
+
+- يمكن عرض البيانات إما من خلال الواجهة أو سطر الأوامر (يجب أن يكون السيرفر مفعل لذا نستخدم تيرمينال جديد):
+
+```sh
+curl http://127.0.0.1:8000
+```
+
+---
+
+- استقبال البيانات من خلال مشروع `FORNT-END`
+
+---
+
+- تنزيل حزمة استقبال البيانات:
+
+```sh
+pip3 install requests
+```
+
+---
+
+- استقبال البيانات من خلال دالة العرض:
+
+```python
+from django.shortcuts import render
+import requests
+
+def board_list(request):
+    
+    # تخزين رابط البيانات
+    backend_url = "http://127.0.0.1:8000"
+
+    # تخصيص نوع البيانات (اختياري)
+    headers = {"Context-Type": "application/json"}
+
+    # استقبال البيانات
+    response = requests.get(backend_url, headers=headers)
+
+    # تحديد شكل البيانات
+    boards = response.json()
+
+    # عرض الصفحة
+    return render(request, "boards/board_list.html", {"boards": boards["Results"]})
+```
+
+---
+
+- تفعيل السيرفر على منفذ مختلف:
+
+```sh
+python manage.py runserver 5000
+```
+
+---
+
+## عرض حالة الطقس من خلال API
+
+---
+
+- إنشاء التطبيق:
+
+```sh
+py manage.py startapp weather_api
+```
+
+---
+
+- إضافته لإعدادات التطبيق
+
+```python
+'weather_api.apps.WeatherApiConfig'
+```
+
+---
+
+- البحث عن احداثيات الدولة من خلال `OPEN-METEO` مثلا للبحث عن إحداثيات البرازيل:
+
+```sh
+https://geocoding-api.open-meteo.com/v1/search?name=Brazil
+```
+
+---
+
+- نسخ قيمة خط الطول ودائرة العرض: `latitude`, `longitiot` وإضافتها لرابط `API`:
+
+```sh
+https://api.open-meteo.com/v1/forecast?latitude=-10.0&longitude=-55.0&current_weather=true
+```
+
+---
+
+- إنشاء دالة العرض:
+
+```python
+def weather(request):
+
+    # تحديد رابط API لجلب الطقس الحالي لطوكيو
+    api_url = "https://api.open-meteo.com/v1/forecast?latitude=35.6895&longitude=139.6917&current_weather=true"
+    
+    context = {}
+
+    # إرسال طلب GET للرابط باستخدام مكتبة requests
+    response = requests.get(api_url)
+
+    # إذا نجح الطلب
+    if response.status_code == 200:
+        
+        # يحول الاستجابة إلى JSON
+        data = response.json()
+
+        # يأخذ بيانات الطقس الحالية من المفتاح current_weather
+        weather = data.get('current_weather', {})
+        if weather:  # نتأكد أن فيه بيانات
+            # تحويل weathercode إلى وصف نصي
+            weathercode_map = {
+                0: "Clear sky",
+                1: "Mainly clear",
+                2: "Partly cloudy",
+                3: "Overcast",
+                45: "Fog",
+                48: "Depositing rime fog",
+                51: "Light drizzle",
+                53: "Moderate drizzle",
+                55: "Dense drizzle",
+                61: "Slight rain",
+                63: "Moderate rain",
+                65: "Heavy rain",
+                80: "Rain showers",
+                95: "Thunderstorm",
+            }
+
+            # يحصل على قيمة الكود من البيانات، ثم يضيف الوصف النصي إلى القاموس تحت المفتاح "condition"
+            code = weather.get("weathercode")
+
+            # يضيف بيانات الطقس إلى السياق (context)
+            weather["condition"] = weathercode_map.get(code, "Unknown")
+            context['weather'] = weather
+    return render(request, 'weather_api/weather.html', context)
+```
+
+- إنشاء القالب:
+
+```html
+{% if weather %}
+    Temperature: {{ weather.temperature }} °C
+    Windspeed: {{ weather.windspeed }} km/h
+    Wind Direction: {{ weather.winddirection }}°
+    Condition: {{ weather.condition }}
+    Time: {{ weather.time }}
+{% else %}
+     Weather data is currently unavailable.
+{% endif %}
+```
+
+---
+
+- أو يمكن استخدام رابط `API` آخر لتحديد اسم أي دولة مباشرة بدون الإحداثيات:
+
+```python
+def weather(request):
+    api_url = "http://api.openweathermap.org./data/2.5/weather?appid=0c42f7f6b53b244c78a418f4f181282a&q="
+    
+    # تحديد دولة الكويت وإضافتها لنهاية الرابط
+    city_name = "Kuwait"
+    url = api_url + city_name
+
+    response = requests.get(url)
+    content = response.json()
+
+    # نقل بيانات الطقس الخام من الرابط الأصلي
+    city_weather = {
+        'city': city_name,
+        'temperature': content['main']['temp'],
+        'description': content['weather'][0]['description'],
+        'icon': content['weather'][0]['icon']
+    }
+
+    return render(request, 'weather_api/weather.html', city_weather)
+```
+
+- عرض البيانات في القالب:
+
+```html
+<img src="http://openweathermap.org/img/w/{{ icon }}.png" alt="Image">
+{{ city }}
+{{ temperature }}° F
+{{description }}
+```
+
+---
+
+- لجعل المستخدم يحدد الدولة بنفسه:
+  - ننشئ جدول في `models` به حقل لإسم الدولة وتنفيذ أوامر الترحيل
+  - ننشئ نموذج في `forms` نخزن من خلاله بيانات المستخدم في جدول `models`
+  - معالجة البيانات بدالة العرض فتصبح بهذا الشكل:
+
+  ```python
+  from django.shortcuts import render
+  import requests
+  from .models import City
+  from .forms import CityForm
+
+
+  def weather(request):
+      url = 'http://api.openweathermap.org./data/2.5/weather?appid=0c42f7f6b53b244c78a418f4f181282a&q='
+
+      if request.method == 'POST':
+          form = CityForm(request.POST)
+          form.save()
+
+      form = CityForm()
+      cities = City.objects.all()
+      weather_data = []
+      
+      if cities:
+          for city in cities:
+              data_url = url + str(city)
+              response = requests.get(data_url).json()
+              city_weather = {
+                  'city': city.name,
+                  'temperature': response['main']['temp'],
+                  'description': response['weather'][0]['description'],
+                  'icon': response['weather'][0]['icon'],
+              }
+              weather_data.append(city_weather)
+
+      return render(request, 'weather_api/weather.html', {'weather_data': weather_data, 'form': form})
+  ```
+
+  - عرض القالب:
+  
+  ```html
+  <form method="POST">
+      {% csrf_token %}
+      {{ form.name }}
+      <button type="submit">Add City</button>
+  </form>
+
+  {% for city_weather in weather_data %}
+      <img src="http://openweathermap.org/img/w/{{ city_weather.icon }}.png" alt="Image">
+      {{ city_weather.city }}
+      {{ city_weather.temperature }}° F
+      {{ city_weather.description }}
+  {% endfor %}
+  ```
+
+---
+
+## نهاية الملف
